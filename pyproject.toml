@@ -9,6 +9,7 @@ classifiers = [
     "Development Status :: 3 - Alpha",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
+    "Framework :: Pytest",
 ]
 readme = "README.md"
 license = {file = "LICENSE"}
@@ -19,6 +20,8 @@ dependencies = [
     "pytest-reportlog",
     "mpi4py",
 ]
+[project.entry-points.pytest11]
+mpiexec = "pytest_mpiexec.pytest_plugin"
 
 [project.urls]
 Documentation = "https://github.com/minrk/pytest-mpiexec#readme"
