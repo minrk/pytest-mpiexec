@@ -76,7 +76,7 @@ target_version = [
 github_url = "https://github.com/minrk/pytest-mpiexec"
 
 [tool.tbump.version]
-current = "0.0.1.dev0"
+current = "0.0.1a1"
 
 regex = '''
   (?P<major>\d+)
