@@ -46,37 +46,35 @@ def pytest_configure(config):
         )
 
 
-def pytest_collection_modifyitems(session, config, items):
-    """Run any tests marked with mpiexec via mpiexec subprocess"""
+def mpi_runtest_protocol(item):
+    """The runtest protocol for mpi tests
+
+    Runs the test in an mpiexec subprocess
+
+    instead of the current process
+    """
+    config = item.config
+    hook = item.config.hook
+    hook.pytest_runtest_logstart(nodeid=item.nodeid, location=item.location)
+    call = pytest.CallInfo.from_call(partial(mpi_runtest, item), "setup")
+    if call.excinfo:
+        report = hook.pytest_runtest_makereport(item=item, call=call)
+        hook.pytest_runtest_logreport(report=report)
+    hook.pytest_runtest_logfinish(nodeid=item.nodeid, location=item.location)
+
+
+def pytest_runtest_protocol(item, nextitem):
+    """Run the MPI protocol for mpi tests
+
+    otherwise, do nothing
+    """
     if os.getenv(MPI_SUBPROCESS_ENV):
         return
-    for item in list(items):
-        mpi_mark = item.get_closest_marker(MPI_MARKER_NAME)
-        if mpi_mark:
-            # run mpi test in a subprocess
-            item.runtest = partial(mpi_runtest, item)
-
-
-def _format_reprentry(reprentry):
-    """Format one traceback entry in a pytest longrepr"""
-    lines = []
-    data = reprentry["data"]
-    lines.extend(data["lines"])
-    lines.append("")
-    lines.append("{path}:{lineno} {message}".format(**data["reprfileloc"]))
-    return "\n".join(lines)
-
-
-def _format_longrepr(longrepr):
-    """Format a recorded longrepr
-
-    TODO: figure out how to recover highlighting?
-    """
-    chunks = []
-    for reprentry in longrepr["reprtraceback"]["reprentries"]:
-        chunks.append(_format_reprentry(reprentry))
-    sep = "\n" + (" -" * 20) + "\n"
-    return sep.join(chunks)
+    mpi_mark = item.get_closest_marker(MPI_MARKER_NAME)
+    if not mpi_mark:
+        return
+    mpi_runtest_protocol(item)
+    return True
 
 
 def mpi_runtest(item):
@@ -130,7 +128,8 @@ def mpi_runtest(item):
                     "mpiexec pytest", "stderr", e.stderr.decode("utf8", "replace")
                 )
             pytest.fail(
-                f"mpi test did not complete in {timeout} seconds", pytrace=False
+                f"mpi test did not complete in {timeout} seconds",
+                pytrace=False,
             )
 
         reportlog_root = os.path.join(reportlog_dir, "reportlog-0.jsonl")
@@ -143,39 +142,16 @@ def mpi_runtest(item):
     # collect report items for the test
     for report in reports:
         if report["$report_type"] == "TestReport":
-            if report.get("longrepr"):
-                item.add_report_section(
-                    report["when"], "traceback", _format_longrepr(report["longrepr"])
-                )
-            for section in report["sections"]:
-                key, rest = section
-                key_parts = key.split()
-                # import pprint
-                # pprint.pprint(report)
-                if len(key_parts) == 3 and key_parts[0] == "Captured":
-                    key, when = key_parts[1:]
-                    key += " (mpi)"
-                    # reportlog seems to repeat reports
-                    # e.g. captured stdout shows up in teardown and call with the same content
-                    if report["when"] == "teardown" and when != report["when"]:
-                        continue
-                else:
-                    key = report["when"]
+            # reconstruct and redisplay the report
+            r = item.config.hook.pytest_report_from_serializable(
+                config=item.config, data=report
+            )
+            item.config.hook.pytest_runtest_logreport(config=item.config, report=r)
 
-                item.add_report_section(
-                    when,
-                    key,
-                    rest,
-                )
-    fail_msg = None
-    if p.returncode:
-        fail_msg = f"mpi test failed with exit status {p.returncode}"
-    elif not reports:
-        fail_msg = "No reports captured!"
-
-    if fail_msg:
+    if p.returncode or not reports:
         if p.stdout:
             item.add_report_section("mpiexec pytest", "stdout", p.stdout)
         if p.stderr:
             item.add_report_section("mpiexec pytest", "stderr", p.stderr)
-        pytest.fail(fail_msg, pytrace=False)
+    if not reports:
+        pytest.fail("No test reports captured from mpi subprocess!", pytrace=False)
