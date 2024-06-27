@@ -17,7 +17,6 @@ MPIEXEC = "mpiexec"
 
 pytest_plugins = ["pytest_reportlog"]
 
-
 def pytest_addoption(parser):
     parser.addoption(
         "--mpiexec",
@@ -25,7 +24,6 @@ def pytest_addoption(parser):
         default=None,
         help="Name of program to run MPI, e.g. mpiexec",
     )
-
 
 def pytest_configure(config):
     global MPIEXEC
@@ -45,7 +43,6 @@ def pytest_configure(config):
             reportlog_dir, f"reportlog-{rank}.jsonl"
         )
 
-
 def mpi_runtest_protocol(item):
     """The runtest protocol for mpi tests
 
@@ -62,7 +59,6 @@ def mpi_runtest_protocol(item):
         hook.pytest_runtest_logreport(report=report)
     hook.pytest_runtest_logfinish(nodeid=item.nodeid, location=item.location)
 
-
 def pytest_runtest_protocol(item, nextitem):
     """Run the MPI protocol for mpi tests
 
@@ -75,7 +71,6 @@ def pytest_runtest_protocol(item, nextitem):
         return
     mpi_runtest_protocol(item)
     return True
-
 
 def mpi_runtest(item):
     """Replacement for runtest
@@ -121,23 +116,25 @@ def mpi_runtest(item):
         except subprocess.TimeoutExpired as e:
             if e.stdout:
                 item.add_report_section(
-                    "mpiexec pytest", "stdout", e.stdout.decode("utf8", "replace")
+                    "mpiexec pytest", "stdout", e.stdout
                 )
             if e.stderr:
                 item.add_report_section(
-                    "mpiexec pytest", "stderr", e.stderr.decode("utf8", "replace")
+                    "mpiexec pytest", "stderr", e.stderr
                 )
             pytest.fail(
                 f"mpi test did not complete in {timeout} seconds",
                 pytrace=False,
             )
 
-        reportlog_root = os.path.join(reportlog_dir, "reportlog-0.jsonl")
+        # Collect logs from all ranks
         reports = []
-        if os.path.exists(reportlog_root):
-            with open(reportlog_root) as f:
-                for line in f:
-                    reports.append(json.loads(line))
+        for rank in range(n):
+            reportlog_file = os.path.join(reportlog_dir, f"reportlog-{rank}.jsonl")
+            if os.path.exists(reportlog_file):
+                with open(reportlog_file) as f:
+                    for line in f:
+                        reports.append(json.loads(line))
 
     # collect report items for the test
     for report in reports:
