@@ -124,24 +124,22 @@ def mpi_runtest(item):
             )
         except subprocess.TimeoutExpired as e:
             if e.stdout:
-                item.add_report_section(
-                    "mpiexec pytest", "stdout", e.stdout.decode("utf8", "replace")
-                )
+                item.add_report_section("mpiexec pytest", "stdout", e.stdout)
             if e.stderr:
-                item.add_report_section(
-                    "mpiexec pytest", "stderr", e.stderr.decode("utf8", "replace")
-                )
+                item.add_report_section("mpiexec pytest", "stderr", e.stderr)
             pytest.fail(
                 f"mpi test did not complete in {timeout} seconds",
                 pytrace=False,
             )
 
-        reportlog_root = os.path.join(reportlog_dir, "reportlog-0.jsonl")
+        # Collect logs from all ranks
         reports = []
-        if os.path.exists(reportlog_root):
-            with open(reportlog_root) as f:
-                for line in f:
-                    reports.append(json.loads(line))
+        for rank in range(n):
+            reportlog_file = os.path.join(reportlog_dir, f"reportlog-{rank}.jsonl")
+            if os.path.exists(reportlog_file):
+                with open(reportlog_file) as f:
+                    for line in f:
+                        reports.append(json.loads(line))
 
     # collect report items for the test
     for report in reports:
