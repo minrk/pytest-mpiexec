@@ -47,3 +47,10 @@ def test_mpi_hang():
 def test_mpi_parametrized(a, mpiexec_n):
     assert MPI.COMM_WORLD.size <= 2, "I don't work with more than 2!"
     assert a == 1
+
+
+@pytest.mark.mpiexec(n=4)
+def test_mpi_fail_subset():
+    rank = MPI.COMM_WORLD.rank
+    # will fail on 2, 3
+    assert rank < 2
