@@ -120,9 +120,13 @@ def mpi_runtest(item):
             )
         except subprocess.TimeoutExpired as e:
             if e.stdout:
-                item.add_report_section("mpiexec pytest", "stdout", e.stdout)
+                item.add_report_section(
+                    "mpiexec pytest", "stdout", e.stdout.decode("utf8", "replace")
+                )
             if e.stderr:
-                item.add_report_section("mpiexec pytest", "stderr", e.stderr)
+                item.add_report_section(
+                    "mpiexec pytest", "stderr", e.stderr.decode("utf8", "replace")
+                )
             pytest.fail(
                 f"mpi test did not complete in {timeout} seconds",
                 pytrace=False,
