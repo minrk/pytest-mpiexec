@@ -10,6 +10,7 @@ classifiers = [
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
     "Framework :: Pytest",
+    "License :: OSI Approved :: MIT License",
 ]
 readme = "README.md"
 license = {file = "LICENSE"}
