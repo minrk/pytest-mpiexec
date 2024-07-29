@@ -4,9 +4,11 @@ import shlex
 import subprocess
 import sys
 from functools import partial
+from pathlib import Path
 from tempfile import TemporaryDirectory
 
 import pytest
+from pytest_reportlog.plugin import ReportLogPlugin
 
 MPI_SUBPROCESS_ENV = "TEST_MPI_SUBTEST"
 TEST_REPORT_DIR_ENV = "TEST_MPI_REPORT_DIR"
@@ -14,8 +16,6 @@ TEST_REPORT_DIR_ENV = "TEST_MPI_REPORT_DIR"
 MPI_MARKER_NAME = "mpiexec"
 
 MPIEXEC = "mpiexec"
-
-pytest_plugins = ["pytest_reportlog"]
 
 
 def pytest_addoption(parser):
@@ -38,12 +38,16 @@ def pytest_configure(config):
         from mpi4py import MPI
 
         rank = MPI.COMM_WORLD.rank
-        reportlog_dir = os.getenv(TEST_REPORT_DIR_ENV, "")
+        reportlog_dir = Path(os.getenv(TEST_REPORT_DIR_ENV, ""))
+        report_path = reportlog_dir / f"reportlog-{rank}.jsonl"
+        config._mpiexec_reporter = reporter = ReportLogPlugin(config, report_path)
+        config.pluginmanager.register(reporter)
 
-        # TODO: can we guarantee reportlog hasn't already been configured?
-        config.option.report_log = os.path.join(
-            reportlog_dir, f"reportlog-{rank}.jsonl"
-        )
+
+def pytest_unconfigure(config):
+    reporter = getattr(config, "_mpiexec_reporter", None)
+    if reporter:
+        reporter.close()
 
 
 def mpi_runtest_protocol(item):
