@@ -19,6 +19,7 @@ pip install pytest-mpiexec
 And write tests that use mpiexec:
 
 ```python
+import pytest
 from mpi4py import MPI
 
 @pytest.mark.mpiexec(n=2)
